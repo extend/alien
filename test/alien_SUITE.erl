@@ -124,9 +124,14 @@ relay(_) ->
 node_route(_C) ->
 	Ref = node_route,
 	Node = node_route_node,
+	%% We need to specify the host explicitly because ct_slave:start/2
+	%% didn't have the (Node, Opts) form before R16B01.
+	{ok, Host0} = inet:gethostname(),
+	Host = list_to_atom(Host0),
 	%% The node needs to be able to load this module for running the funs.
-	{ok, NodeName} = ct_slave:start(Node, [{erl_flags, "-pa "
-		++ filename:absname(filename:dirname(code:which(?MODULE)))}]),
+	{ok, NodeName} = ct_slave:start(Host, Node, [{erl_flags, "-pa "
+		++ filename:absname(filename:dirname(code:which(?MODULE)))},
+		{boot_timeout, 10000}, {init_timeout, 5000}, {startup_timeout, 5000}]),
 	%% Create a process that will forward all messages to us
 	%% wrapped in a tuple so we know it reached the destination.
 	ok = rpc:call(NodeName, node_route_node, start, [self()]),
