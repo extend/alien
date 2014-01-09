@@ -26,6 +26,8 @@
 -export([ondemand/1]).
 -export([process/1]).
 -export([relay/1]).
+-export([call_route/1]).
+-export([call_route_callback/2]).
 -export([node_route/1]).
 -export([udp_route/1]).
 
@@ -34,7 +36,7 @@
 %% ct.
 
 all() ->
-	[inline, ondemand, process, relay, node_route, udp_route].
+	[inline, ondemand, process, relay, call_route, node_route, udp_route].
 
 init_per_suite(Config) ->
 	ok = application:start(alien),
@@ -119,6 +121,21 @@ relay(_) ->
 	alien:stop_relay(RelayRef),
 	[] = alien:list_relays(),
 	false = is_process_alive(Pid),
+	ok.
+
+call_route(_C) ->
+	Ref = call_route,
+	OTPRelease = erlang:system_info(otp_release),
+	alien:probe(Ref, otp_release_probe, {call, ?MODULE, call_route_callback}),
+	receive {call_route_callback, Ref, OTPRelease} ->
+		ok
+	after 500 ->
+		error(timeout)
+	end,
+	ok.
+
+call_route_callback(Ref, Event) ->
+	self() ! {call_route_callback, Ref, Event},
 	ok.
 
 node_route(_C) ->

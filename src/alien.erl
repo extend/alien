@@ -36,7 +36,8 @@
 
 -type ref() :: any().
 -type filters() :: []. %[fun((any()) -> ok | drop)].
--type route() :: {msg, atom() | pid() | port()}
+-type route() :: {call, module(), atom()}
+	| {msg, atom() | pid() | port()}
 	| {msg, node(), atom()}
 	| {udp, inet:hostname(), inet:port_number(), 0..16#ffff}.
 %	| {tcp, inet:hostname(), inet:port_number(), [gen_tcp:option()]} %% opts?
@@ -172,6 +173,9 @@ filter([], _) ->
 %			drop
 %	end.
 
+send(Ref, Event, {call, Module, Function}) ->
+	_ = Module:Function(Ref, Event),
+	ok;
 send(Ref, Event, {msg, Dest}) ->
 	send_msg(Dest, {?MODULE, Ref, Event});
 send(Ref, Event, {msg, Node, LocalName}) ->
