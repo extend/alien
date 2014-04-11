@@ -11,7 +11,7 @@ start_link(RelayRef, _Opts = []) ->
 
 loop(RelayRef) ->
 	receive
-		{alien, Ref, Event} ->
-			alien:relay(RelayRef, Ref, Event),
+		{alien, Node, Ref, Event} ->
+			alien:relay(RelayRef, Node, Ref, Event),
 			loop(RelayRef)
 	end.

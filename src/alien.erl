@@ -27,7 +27,7 @@
 
 %% Events.
 -export([event/2]).
--export([relay/3]).
+-export([relay/4]).
 
 %% Internal.
 -export([sync_event/3]).
@@ -91,7 +91,7 @@ list_probes() ->
 %% Ondemand probes always send an event.
 -spec probe(ref(), module(), route()) -> ok.
 probe(Ref, Module, Route) ->
-	send(Ref, Module:probe(Ref), Route).
+	send(Ref, node(), Module:probe(Ref), Route).
 
 %% Relays.
 
@@ -143,22 +143,22 @@ sync_event(Ref, Event, FromPid) ->
 		%% Crash on everything else.
 	end.
 
--spec relay(ref(), ref(), event()) -> ok.
-relay(RelayRef, Ref, Event) ->
+-spec relay(ref(), node(), ref(), event()) -> ok.
+relay(RelayRef, Node, Ref, Event) ->
 	case ets:lookup(?TAB, RelayRef) of
 		%% Drop events with no corresponding relay.
 		[] ->
 			ok;
 		%% Process events with corresponding relay unconditionally.
 		[{_, relay, _, _, Route}] ->
-			send(Ref, Event, Route)
+			send(Ref, Node, Event, Route)
 		%% Crash on everything else.
 	end.
 
 maybe_send(Ref, Event, Route, Filters) ->
 	case filter(Filters, Event) of
 		ok ->
-			send(Ref, Event, Route)
+			send(Ref, node(), Event, Route)
 %		drop ->
 %			ok
 	end.
@@ -173,14 +173,16 @@ filter([], _) ->
 %			drop
 %	end.
 
-send(Ref, Event, {call, Module, Function}) ->
-	_ = Module:Function(Ref, Event),
+send(Ref, Node, Event, {call, Module, Function}) ->
+	_ = Module:Function(Node, Ref, Event),
 	ok;
-send(Ref, Event, {msg, Dest}) ->
-	send_msg(Dest, {?MODULE, Ref, Event});
-send(Ref, Event, {msg, Node, LocalName}) ->
-	send_msg({LocalName, Node}, {?MODULE, Ref, Event});
-send(_, Event, {udp, Host, Port, ID}) ->
+send(Ref, Node, Event, {msg, Dest}) ->
+	send_msg(Dest, {?MODULE, Node, Ref, Event});
+send(Ref, Node, Event, {msg, RemoteNode, LocalName}) ->
+	send_msg({LocalName, RemoteNode}, {?MODULE, Node, Ref, Event});
+%% We do not send the node name as the remote end is
+%% supposed to figure it out from ID.
+send(_, _, Event, {udp, Host, Port, ID}) ->
 	case gen_udp:open(0) of
 		{ok, Socket} ->
 			try
@@ -194,9 +196,9 @@ send(_, Event, {udp, Host, Port, ID}) ->
 		_ ->
 			ok
 	end.
-%send(_Ref, _Event, _Route={tcp, _, _, _}) ->
+%send(_Ref, _Node, _Event, _Route={tcp, _, _, _}) ->
 %	todo;
-%send(_Ref, _Event, _Route={ssl, _, _, _}) ->
+%send(_Ref, _Node, _Event, _Route={ssl, _, _, _}) ->
 %	todo.
 
 send_msg(Dest, Msg) ->
